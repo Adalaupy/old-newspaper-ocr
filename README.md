@@ -1,5 +1,7 @@
 # Traditional Chinese Newspaper OCR
 
+![App Cover](App%20Screenshot.jpg)
+
 A Python application for OCR processing of traditional Chinese old newspapers with a user-friendly interface.
 
 ## Features
