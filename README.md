@@ -18,7 +18,7 @@ A Python application for OCR processing of traditional Chinese old newspapers wi
 - **Manual Crop Ordering**: Drag to reorder crop regions for proper text flow
 - **Real-time Preview**: View OCR results before saving
 - **Batch Processing**: Process multiple images with background queue
-- **Comprehensive Output**: Saves original image, annotated image, and OCR text
+- **Comprehensive Output**: Saves annotated image and OCR text
 
 ## Installation
 
