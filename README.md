@@ -72,24 +72,28 @@ python main.py
 ## Project Structure
 
 ```
-ocr_newspaper/
-├── main.py                 # Application entry point
+OCR/
+├── App Screenshot.jpg     # UI cover image
+├── instruction.md         # Original requirements
+├── main.py                # Application entry point
 ├── config.py              # Configuration settings
 ├── requirements.txt       # Python dependencies
+├── run.bat                # Run script (Windows)
+├── setup.bat              # Setup script (Windows)
+├── setup.py               # Packaging/setup metadata
 ├── models/                # Data models
-│   ├── image_data.py     # Image data model
-│   └── crop_region.py    # Crop region model
-├── services/             # Business logic
-│   ├── image_processor.py   # Image preprocessing
+│   ├── image_data.py       # Image data model
+│   └── crop_region.py      # Crop region model
+├── services/              # Business logic
+│   ├── image_processor.py  # Image preprocessing
 │   ├── ocr_engine.py       # OCR operations
 │   ├── pdf_handler.py      # PDF processing
 │   └── file_manager.py     # File I/O operations
-├── ui/                   # User interface
-│   ├── main_window.py    # Main application window
-│   ├── image_canvas.py   # Image display and cropping
-│   └── crop_list_panel.py # Crop management panel
-├── utils/                # Utilities
-└── output/              # Output folder (created automatically)
+├── ui/                    # User interface
+│   ├── main_window.py      # Main application window
+│   ├── image_canvas.py     # Image display and cropping
+│   └── crop_list_panel.py  # Crop management panel
+└── output/                # Output folder (created automatically)
 ```
 
 ## Configuration
