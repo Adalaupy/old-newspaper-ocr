@@ -83,6 +83,24 @@ class ImageCanvas(ctk.CTkFrame):
         self.pan_offset_y = 0
         self.selected_crop_index = None
         self._update_display()
+
+    def clear_image(self):
+        """Clear the canvas and reset image state."""
+        self.original_image = None
+        self.display_image = None
+        self.photo_image = None
+        self.display_size = (0, 0)
+        self.zoom_level = 1.0
+        self.pan_offset_x = 0
+        self.pan_offset_y = 0
+        self.crop_regions = []
+        self.selected_crop_index = None
+        self.crop_start = None
+        self.crop_current = None
+        self.is_cropping = False
+        self.is_panning = False
+        self.pan_start = None
+        self.canvas.delete("all")
     
     def _update_display(self):
         """Update the canvas display"""

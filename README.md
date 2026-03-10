@@ -7,6 +7,7 @@ A Python application for OCR processing of traditional Chinese old newspapers wi
 ## Features
 
 - **Multi-file Import**: Import multiple images or PDF files in a single batch
+- **Clipboard Paste**: Paste images directly into the batch with Ctrl+V
 - **PDF Support**: Extract and process specific pages from PDF documents
 - **Flexible Crop Selection**: Use rectangle selection tool to choose specific areas
 - **Reading Direction Support**: 
@@ -52,6 +53,7 @@ python main.py
    - Click "Import Files" button
    - Select one or multiple image files or PDFs
    - For PDFs, choose whether to import all pages
+   - Or press Ctrl+V to paste images from the clipboard
 
 3. Process images:
    - Draw rectangles on the image to select crop regions
@@ -64,7 +66,6 @@ python main.py
    - Review OCR results in the preview panel
    - Click "Save Results" to export everything to a folder
    - Output includes:
-     - Original image
      - Annotated image with crop rectangles
      - Text file with OCR results
 

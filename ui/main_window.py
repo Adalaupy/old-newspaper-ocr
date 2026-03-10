@@ -97,6 +97,7 @@ class MainWindow(ctk.CTk):
             font=("Arial", 9),
             text_color="gray70"
         ).pack(pady=(2, 0))
+        ctk.CTkButton(file_frame, text="Clear All", command=self._clear_all_images).pack(fill="x", pady=2)
         
         # Navigation
         nav_frame = ctk.CTkFrame(file_frame)
@@ -306,6 +307,32 @@ class MainWindow(ctk.CTk):
             self._load_current_image()
 
         self._update_image_counter()
+
+    def _clear_all_images(self):
+        """Clear all loaded images and reset UI state."""
+        if self.is_processing:
+            self.stop_requested.set()
+            self.processing_paused.set()
+
+        self._drain_processing_queue()
+        self.image_batch.clear()
+        self.current_image_index = 0
+        self.batch_id = None
+
+        self.canvas_panel.clear_image()
+        self.crop_list.update_crops([])
+        self.preview_text.delete("1.0", "end")
+        self.filename_entry.delete(0, "end")
+        self.language_var.set(config.DEFAULT_LANGUAGE)
+        default_read_dir_key = next(
+            (key for key, value in config.READ_DIRECTIONS.items()
+             if value == config.DEFAULT_READ_DIRECTION),
+            list(config.READ_DIRECTIONS.keys())[0]
+        )
+        self.read_dir_var.set(default_read_dir_key)
+        self.image_counter.configure(text="0/0")
+        self._set_processing_controls_idle()
+        self._update_pending_status()
     
     def _import_image(self, filepath: str):
         """Import a single image file"""
