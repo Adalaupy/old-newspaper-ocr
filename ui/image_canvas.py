@@ -30,11 +30,17 @@ class ImageCanvas(ctk.CTkFrame):
         # Display state
         self.zoom_level = 1.0
         self.display_size = (0, 0)
+        self.pan_offset_x = 0
+        self.pan_offset_y = 0
         
         # Crop selection state
         self.crop_start = None
         self.crop_current = None
         self.is_cropping = False
+        
+        # Pan state
+        self.is_panning = False
+        self.pan_start = None
         
         # Existing crops to display
         self.crop_regions = []
@@ -56,6 +62,11 @@ class ImageCanvas(ctk.CTkFrame):
         self.canvas.bind("<ButtonPress-1>", self._on_mouse_down)
         self.canvas.bind("<B1-Motion>", self._on_mouse_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_mouse_up)
+        
+        # Bind mouse events for panning (right-click)
+        self.canvas.bind("<ButtonPress-3>", self._on_pan_start)
+        self.canvas.bind("<B3-Motion>", self._on_pan_drag)
+        self.canvas.bind("<ButtonRelease-3>", self._on_pan_end)
     
     def load_image(self, image: Image.Image, crop_regions: list = None):
         """
@@ -68,6 +79,8 @@ class ImageCanvas(ctk.CTkFrame):
         self.original_image = image
         self.crop_regions = crop_regions or []
         self.zoom_level = 1.0
+        self.pan_offset_x = 0
+        self.pan_offset_y = 0
         self.selected_crop_index = None
         self._update_display()
     
@@ -117,9 +130,9 @@ class ImageCanvas(ctk.CTkFrame):
         # Update canvas
         self.canvas.delete("all")
         
-        # Center image on canvas
-        x = (canvas_width - new_width) // 2
-        y = (canvas_height - new_height) // 2
+        # Center image on canvas with pan offset
+        x = (canvas_width - new_width) // 2 + self.pan_offset_x
+        y = (canvas_height - new_height) // 2 + self.pan_offset_y
         
         self.canvas.create_image(x, y, anchor="nw", image=self.photo_image)
         self.image_offset = (x, y)
@@ -222,6 +235,38 @@ class ImageCanvas(ctk.CTkFrame):
                 dash=(5, 5)
             )
     
+    def _on_pan_start(self, event):
+        """Handle right-click press to start panning"""
+        if self.original_image is None:
+            return
+        
+        self.is_panning = True
+        self.pan_start = (event.x, event.y)
+    
+    def _on_pan_drag(self, event):
+        """Handle right-click drag to pan the view"""
+        if not self.is_panning or self.pan_start is None:
+            return
+        
+        # Calculate drag delta
+        dx = event.x - self.pan_start[0]
+        dy = event.y - self.pan_start[1]
+        
+        # Update pan offset
+        self.pan_offset_x += dx
+        self.pan_offset_y += dy
+        
+        # Update pan start for next drag event
+        self.pan_start = (event.x, event.y)
+        
+        # Redraw with new offset
+        self._update_display()
+    
+    def _on_pan_end(self, event):
+        """Handle right-click release to end panning"""
+        self.is_panning = False
+        self.pan_start = None
+    
     def _canvas_to_image_coords(self, canvas_x, canvas_y):
         """Convert canvas coordinates to original image coordinates"""
         if self.original_image is None or not hasattr(self, 'image_offset'):
@@ -273,6 +318,8 @@ class ImageCanvas(ctk.CTkFrame):
     def zoom_reset(self):
         """Reset zoom to fit"""
         self.zoom_level = 1.0
+        self.pan_offset_x = 0
+        self.pan_offset_y = 0
         self._update_display()
     
     def set_selected_crop(self, index: Optional[int]):

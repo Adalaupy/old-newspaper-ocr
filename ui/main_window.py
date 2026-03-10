@@ -146,7 +146,16 @@ class MainWindow(ctk.CTk):
         
         ctk.CTkButton(zoom_frame, text="Zoom In", width=80, command=self._zoom_in).pack(side="left", padx=2)
         ctk.CTkButton(zoom_frame, text="Zoom Out", width=80, command=self._zoom_out).pack(side="left", padx=2)
-        ctk.CTkButton(zoom_frame, text="Reset", width=60, command=self._zoom_reset).pack(side="left", padx=2)
+        ctk.CTkButton(zoom_frame, text="Reset", width=80, command=self._zoom_reset).pack(side="left", padx=2)
+        
+        # Hint for panning
+        hint_label = ctk.CTkLabel(
+            ops_frame, 
+            text="💡 Right-click & drag to pan when zoomed",
+            font=("Arial", 9),
+            text_color="gray70"
+        )
+        hint_label.pack(pady=(2, 5))
         
         # Rotation
         ctk.CTkButton(ops_frame, text="Rotate 90°", command=self._rotate_image).pack(fill="x", pady=2)
