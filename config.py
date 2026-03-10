@@ -22,7 +22,7 @@ DEFAULT_READ_DIRECTION = "vertical_rtl"
 DEFAULT_LANGUAGE = "Traditional Chinese"
 
 # UI Settings
-WINDOW_TITLE = "Traditional Chinese Newspaper OCR"
+WINDOW_TITLE = "Old Newspaper OCR"
 WINDOW_SIZE = "1400x900"
 CANVAS_BG_COLOR = "#2b2b2b"
 CROP_RECT_COLOR = "red"
