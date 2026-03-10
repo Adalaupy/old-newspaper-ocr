@@ -3,7 +3,7 @@ Main application window
 """
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from PIL import Image
+from PIL import Image, ImageGrab
 import threading
 import queue
 import os
@@ -45,6 +45,7 @@ class MainWindow(ctk.CTk):
         # Setup UI
         self._setup_ui()
         self._setup_menu()
+        self.bind_all("<Control-v>", self._paste_image)
         
         # Start background processor
         self._start_background_processor()
@@ -90,6 +91,12 @@ class MainWindow(ctk.CTk):
         ctk.CTkLabel(file_frame, text="File Operations", font=("Arial", 12, "bold")).pack(pady=5)
         
         ctk.CTkButton(file_frame, text="Import Files", command=self._import_files).pack(fill="x", pady=2)
+        ctk.CTkLabel(
+            file_frame,
+            text="Paste (Ctrl+V) to add images",
+            font=("Arial", 9),
+            text_color="gray70"
+        ).pack(pady=(2, 0))
         
         # Navigation
         nav_frame = ctk.CTkFrame(file_frame)
@@ -261,6 +268,44 @@ class MainWindow(ctk.CTk):
             self.current_image_index = 0
             self._load_current_image()
             self._update_image_counter()
+
+    def _paste_image(self, event=None):
+        """Paste image(s) from clipboard and append to current batch."""
+        clipboard_data = ImageGrab.grabclipboard()
+        if clipboard_data is None:
+            messagebox.showinfo("Paste", "Clipboard is empty or has no image.")
+            return
+
+        new_images = []
+        if isinstance(clipboard_data, Image.Image):
+            new_images.append(("clipboard", clipboard_data))
+        elif isinstance(clipboard_data, list):
+            supported_exts = (".png", ".jpg", ".jpeg", ".tiff", ".bmp")
+            for path in clipboard_data:
+                if isinstance(path, str) and path.lower().endswith(supported_exts):
+                    try:
+                        new_images.append((path, Image.open(path)))
+                    except Exception:
+                        continue
+
+        if not new_images:
+            messagebox.showinfo("Paste", "No image found in clipboard.")
+            return
+
+        if self.batch_id is None:
+            self.batch_id = datetime.now().strftime("%H%M")
+
+        was_empty = len(self.image_batch) == 0
+        for path, img in new_images:
+            image_index = len(self.image_batch)
+            image_data = ImageData(path, img, image_index=image_index)
+            self.image_batch.append(image_data)
+
+        if was_empty and self.image_batch:
+            self.current_image_index = 0
+            self._load_current_image()
+
+        self._update_image_counter()
     
     def _import_image(self, filepath: str):
         """Import a single image file"""
