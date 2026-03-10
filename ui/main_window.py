@@ -96,7 +96,7 @@ class MainWindow(ctk.CTk):
         nav_frame.pack(fill="x", pady=5)
         
         ctk.CTkButton(nav_frame, text="◄ Prev", width=70, command=self._prev_image).pack(side="left", padx=2)
-        self.image_counter = ctk.CTkLabel(nav_frame, text="0/0")
+        self.image_counter = ctk.CTkLabel(nav_frame, text="0/0", width=90)
         self.image_counter.pack(side="left", padx=5)
         ctk.CTkButton(nav_frame, text="Next ►", width=70, command=self._next_image).pack(side="right", padx=2)
         
