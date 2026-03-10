@@ -1,0 +1,15 @@
+# OCR Engine
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0
+
+# Image Processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+pdf2image>=1.16.0
+PyMuPDF>=1.23.0
+
+# UI
+customtkinter>=5.2.0
+
+# Utilities
+numpy>=1.24.0
