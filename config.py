@@ -47,6 +47,16 @@ SUPPORTED_IMAGE_FORMATS = [
 # OCR settings
 OCR_USE_GPU = False
 OCR_LANG = "ch"  # PaddleOCR language code for traditional Chinese
+OCR_DROP_SCORE = 0.05  # Keep more low-confidence candidates to reduce missed words
+OCR_DET_DB_THRESH = 0.2  # Lower text detection threshold for faint newspaper print
+OCR_DET_DB_BOX_THRESH = 0.35  # Lower box confidence threshold to keep weak text boxes
+OCR_UNKNOWN_TOKEN = "[UNK]"  # Placeholder for words that cannot be recognized
+OCR_UNKNOWN_CONFIDENCE = 0.35  # Mark low-confidence words as unknown
+OCR_PYCORRECTOR_ENABLED = True  # Use pycorrector to post-correct OCR text
+OCR_PYCORRECTOR_SKIP_UNKNOWN = True  # Skip correction when [UNK] appears in a line
+OCR_GAP_UNKNOWN_ENABLED = True  # Insert unknown marker when a likely word gap is detected
+OCR_GAP_FACTOR = 1.9  # Gap ratio threshold for missing-word heuristic
+OCR_SAME_LINE_TOLERANCE = 0.7  # Line/column grouping tolerance ratio
 
 # Processing
 MAX_CONCURRENT_PROCESSES = 3

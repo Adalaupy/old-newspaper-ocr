@@ -39,7 +39,7 @@ class CropListPanel(ctk.CTkFrame):
         title.pack(pady=(5, 10))
         
         # Scrollable frame for crop list
-        self.scroll_frame = ctk.CTkScrollableFrame(self, width=200)
+        self.scroll_frame = ctk.CTkScrollableFrame(self, width=300)
         self.scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Buttons frame
@@ -63,7 +63,7 @@ class CropListPanel(ctk.CTkFrame):
             command=self._on_move_up,
             state="disabled"
         )
-        self.move_up_btn.pack(side="left", padx=2)
+        self.move_up_btn.pack(side="right", padx=2)
         
         # Move down button
         self.move_down_btn = ctk.CTkButton(
@@ -73,7 +73,7 @@ class CropListPanel(ctk.CTkFrame):
             command=self._on_move_down,
             state="disabled"
         )
-        self.move_down_btn.pack(side="left", padx=2)
+        self.move_down_btn.pack(side="right", padx=2)
     
     def update_crops(self, crop_regions: List[CropRegion]):
         """

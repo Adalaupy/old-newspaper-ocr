@@ -13,3 +13,4 @@ customtkinter>=5.2.0
 
 # Utilities
 numpy>=1.24.0
+pycorrector>=1.1.0

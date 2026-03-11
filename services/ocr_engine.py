@@ -18,6 +18,8 @@ from paddleocr import PaddleOCR
 from PIL import Image
 import numpy as np
 import config
+import pycorrector
+
 
 
 class OCREngine:
@@ -26,6 +28,7 @@ class OCREngine:
     def __init__(self):
         """Initialize OCR engine"""
         self.ocr = None
+        self.pycorrector_available = pycorrector is not None
         self._initialize_ocr()
     
     def _initialize_ocr(self):
@@ -41,6 +44,15 @@ class OCREngine:
             init_kwargs = {
                 "lang": config.OCR_LANG,
             }
+
+            if "drop_score" in supported_args:
+                init_kwargs["drop_score"] = config.OCR_DROP_SCORE
+            if "text_rec_score_thresh" in supported_args:
+                init_kwargs["text_rec_score_thresh"] = config.OCR_DROP_SCORE
+            if "det_db_thresh" in supported_args:
+                init_kwargs["det_db_thresh"] = config.OCR_DET_DB_THRESH
+            if "det_db_box_thresh" in supported_args:
+                init_kwargs["det_db_box_thresh"] = config.OCR_DET_DB_BOX_THRESH
 
             if "device" in supported_args:
                 init_kwargs["device"] = "gpu" if config.OCR_USE_GPU else "cpu"
@@ -129,7 +141,7 @@ class OCREngine:
                 result = self._predict(img_array)
             except Exception as array_error:
                 print(f"OCR processing failed: {array_error}")
-                return ""
+                return config.OCR_UNKNOWN_TOKEN
         finally:
             # Clean up temp file
             if temp_file and os.path.exists(temp_file):
@@ -142,17 +154,20 @@ class OCREngine:
             normalized = self._normalize_ocr_result(result)
         except Exception as normalize_error:
             print(f"OCR normalize failed: {normalize_error}")
-            return ""
+            return config.OCR_UNKNOWN_TOKEN
 
         if not normalized:
-            return ""
+            return config.OCR_UNKNOWN_TOKEN
         
         # Extract text based on reading direction
         try:
             text = self._format_text_by_direction(normalized, read_direction)
         except Exception as format_error:
             print(f"OCR format failed: {format_error}")
-            return ""
+            return config.OCR_UNKNOWN_TOKEN
+
+        if not text.strip():
+            return config.OCR_UNKNOWN_TOKEN
         
         return text
     
@@ -182,12 +197,15 @@ class OCREngine:
             if not isinstance(text_info, (list, tuple)) or len(text_info) < 1:
                 continue
 
-            text = "" if text_info[0] is None else str(text_info[0])
+            text = "" if text_info[0] is None else str(text_info[0]).strip()
 
             try:
                 confidence = float(text_info[1]) if len(text_info) > 1 else 0.0
             except (TypeError, ValueError):
                 confidence = 0.0
+
+            if not text or confidence < config.OCR_UNKNOWN_CONFIDENCE:
+                text = config.OCR_UNKNOWN_TOKEN
 
             if not isinstance(box, (list, tuple)):
                 continue
@@ -210,12 +228,16 @@ class OCREngine:
             y_coords = [point[1] for point in points]
             center_x = sum(x_coords) / len(x_coords)
             center_y = sum(y_coords) / len(y_coords)
+            box_width = max(x_coords) - min(x_coords)
+            box_height = max(y_coords) - min(y_coords)
             
             text_boxes.append({
                 'text': text,
                 'x': center_x,
                 'y': center_y,
-                'confidence': confidence
+                'confidence': confidence,
+                'width': box_width,
+                'height': box_height,
             })
 
         if not text_boxes:
@@ -236,10 +258,80 @@ class OCREngine:
             # Right to left, top to bottom
             text_boxes.sort(key=lambda b: (b['y'], -b['x']))
         
-        # Combine text
-        recognized_text = '\n'.join([box['text'] for box in text_boxes])
-        
-        return recognized_text
+        # Combine text with optional missing-word marker insertion.
+        recognized_tokens = self._insert_gap_unknown_tokens(text_boxes, direction)
+        recognized_text = '\n'.join(recognized_tokens)
+
+        return self._apply_pycorrector(recognized_text)
+
+    def _insert_gap_unknown_tokens(self, text_boxes: list, direction: str) -> list:
+        """Insert [UNK] when spacing suggests a likely missing word."""
+        if not text_boxes:
+            return []
+
+        if not config.OCR_GAP_UNKNOWN_ENABLED:
+            return [box['text'] for box in text_boxes]
+
+        widths = [max(1.0, float(box.get('width', 1.0))) for box in text_boxes]
+        heights = [max(1.0, float(box.get('height', 1.0))) for box in text_boxes]
+        median_width = float(np.median(widths))
+        median_height = float(np.median(heights))
+
+        same_row_tol = max(2.0, median_height * config.OCR_SAME_LINE_TOLERANCE)
+        same_col_tol = max(2.0, median_width * config.OCR_SAME_LINE_TOLERANCE)
+        horizontal_gap_thresh = max(median_width * config.OCR_GAP_FACTOR, median_width + 5.0)
+        vertical_gap_thresh = max(median_height * config.OCR_GAP_FACTOR, median_height + 5.0)
+
+        tokens = []
+        prev = None
+        for box in text_boxes:
+            if prev is not None:
+                missing_gap = False
+                if direction in ("horizontal_ltr", "horizontal_rtl"):
+                    same_line = abs(box['y'] - prev['y']) <= same_row_tol
+                    gap = abs(box['x'] - prev['x'])
+                    if same_line and gap > horizontal_gap_thresh:
+                        missing_gap = True
+                else:
+                    same_line = abs(box['x'] - prev['x']) <= same_col_tol
+                    gap = abs(box['y'] - prev['y'])
+                    if same_line and gap > vertical_gap_thresh:
+                        missing_gap = True
+
+                if missing_gap:
+                    tokens.append(config.OCR_UNKNOWN_TOKEN)
+
+            tokens.append(box['text'])
+            prev = box
+
+        return tokens
+
+    def _apply_pycorrector(self, text: str) -> str:
+        """Post-correct OCR text with pycorrector when available."""
+        if not text:
+            return text
+
+        if not config.OCR_PYCORRECTOR_ENABLED or not self.pycorrector_available:
+            return text
+
+        corrected_lines = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                corrected_lines.append(line)
+                continue
+
+            if config.OCR_PYCORRECTOR_SKIP_UNKNOWN and config.OCR_UNKNOWN_TOKEN in stripped:
+                corrected_lines.append(line)
+                continue
+
+            try:
+                corrected_line, _ = pycorrector.correct(stripped)
+                corrected_lines.append(corrected_line if corrected_line else line)
+            except Exception:
+                corrected_lines.append(line)
+
+        return '\n'.join(corrected_lines)
 
     def _normalize_ocr_result(self, result: list) -> list:
         """
