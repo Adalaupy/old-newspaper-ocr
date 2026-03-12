@@ -209,8 +209,7 @@ class OCREngine:
         # Extract text boxes with coordinates
         text_boxes = []
         for line in ocr_result:
-            
-            print(line)
+
             if not isinstance(line, (list, tuple)) or len(line) < 2:
                 continue
             
@@ -297,8 +296,7 @@ class OCREngine:
         if not config.OCR_GAP_UNKNOWN_ENABLED:
             return [box['text'] for box in text_boxes]
 
-        for item in text_boxes:
-            print(item)
+
 
         widths = [max(1.0, float(box.get('width', 1.0))) for box in text_boxes]
         heights = [max(1.0, float(box.get('height', 1.0))) for box in text_boxes]
