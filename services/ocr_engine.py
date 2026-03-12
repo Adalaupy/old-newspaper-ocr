@@ -20,6 +20,11 @@ import numpy as np
 import config
 import pycorrector
 
+try:
+    from opencc import OpenCC
+except Exception:
+    OpenCC = None
+
 
 
 class OCREngine:
@@ -29,7 +34,23 @@ class OCREngine:
         """Initialize OCR engine"""
         self.ocr = None
         self.pycorrector_available = pycorrector is not None
+        self.opencc_converter = self._initialize_opencc_converter()
         self._initialize_ocr()
+
+    def _initialize_opencc_converter(self):
+        """Initialize OpenCC converter for final Traditional Chinese output."""
+        if not config.OCR_ENFORCE_TRADITIONAL_CHINESE:
+            return None
+
+        if OpenCC is None:
+            print("OpenCC is not available; OCR output will not be converted to Traditional Chinese")
+            return None
+
+        try:
+            return OpenCC(config.OCR_TRADITIONAL_CONVERSION)
+        except Exception as e:
+            print(f"Failed to initialize OpenCC converter: {e}")
+            return None
     
     def _initialize_ocr(self):
         """Initialize PaddleOCR with default settings"""
@@ -168,8 +189,8 @@ class OCREngine:
 
         if not text.strip():
             return config.OCR_UNKNOWN_TOKEN
-        
-        return text
+
+        return self._ensure_traditional_chinese(text)
     
     def _format_text_by_direction(self, ocr_result: list, direction: str) -> str:
         """
@@ -188,6 +209,8 @@ class OCREngine:
         # Extract text boxes with coordinates
         text_boxes = []
         for line in ocr_result:
+            
+            print(line)
             if not isinstance(line, (list, tuple)) or len(line) < 2:
                 continue
             
@@ -198,6 +221,8 @@ class OCREngine:
                 continue
 
             text = "" if text_info[0] is None else str(text_info[0]).strip()
+
+
 
             try:
                 confidence = float(text_info[1]) if len(text_info) > 1 else 0.0
@@ -272,6 +297,9 @@ class OCREngine:
         if not config.OCR_GAP_UNKNOWN_ENABLED:
             return [box['text'] for box in text_boxes]
 
+        for item in text_boxes:
+            print(item)
+
         widths = [max(1.0, float(box.get('width', 1.0))) for box in text_boxes]
         heights = [max(1.0, float(box.get('height', 1.0))) for box in text_boxes]
         median_width = float(np.median(widths))
@@ -332,6 +360,22 @@ class OCREngine:
                 corrected_lines.append(line)
 
         return '\n'.join(corrected_lines)
+
+    def _ensure_traditional_chinese(self, text: str) -> str:
+        """Convert final OCR text to Traditional Chinese when configured."""
+        if not text:
+            return text
+
+        if not config.OCR_ENFORCE_TRADITIONAL_CHINESE:
+            return text
+
+        if self.opencc_converter is None:
+            return text
+
+        try:
+            return self.opencc_converter.convert(text)
+        except Exception:
+            return text
 
     def _normalize_ocr_result(self, result: list) -> list:
         """

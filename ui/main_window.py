@@ -27,6 +27,7 @@ class MainWindow(ctk.CTk):
         # Window setup
         self.title(config.WINDOW_TITLE)
         self.geometry(config.WINDOW_SIZE)
+        self._maximize_on_startup()
         
         # Application state
         self.image_batch: List[ImageData] = []
@@ -49,6 +50,14 @@ class MainWindow(ctk.CTk):
         
         # Start background processor
         self._start_background_processor()
+
+    def _maximize_on_startup(self):
+        """Maximize the main window when the app starts."""
+        try:
+            self.state("zoomed")
+        except Exception:
+            # Fallback for environments that use the -zoomed window attribute.
+            self.after(0, lambda: self.attributes("-zoomed", True))
     
     def _init_services(self):
         """Initialize service objects"""

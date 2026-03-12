@@ -21,6 +21,10 @@ def main():
         # Create and run application
         app = MainWindow()
         app.mainloop()
+    except KeyboardInterrupt:
+        # Allow clean shutdown when stopping from terminal (Ctrl+C)
+        print("Application interrupted by user.")
+        sys.exit(0)
     except Exception as e:
         print(f"Error starting application: {e}")
         import traceback
