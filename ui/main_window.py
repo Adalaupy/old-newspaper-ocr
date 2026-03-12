@@ -8,7 +8,7 @@ import threading
 import queue
 import os
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import config
 from models import ImageData, CropRegion
@@ -16,6 +16,9 @@ from services import ImageProcessor, OCREngine, PDFHandler, FileManager
 
 from ui.image_canvas import ImageCanvas
 from ui.crop_list_panel import CropListPanel
+
+if TYPE_CHECKING:
+    from services.ocr_base import BaseOCREngine
 
 
 class MainWindow(ctk.CTk):
@@ -32,7 +35,7 @@ class MainWindow(ctk.CTk):
         # Application state
         self.image_batch: List[ImageData] = []
         self.current_image_index = 0
-        self.ocr_engine: Optional[OCREngine] = None
+        self.ocr_engine: Optional["BaseOCREngine"] = None
         self.processing_queue = queue.Queue()
         self.processing_paused = threading.Event()
         self.processing_paused.set()

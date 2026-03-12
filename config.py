@@ -45,6 +45,11 @@ SUPPORTED_IMAGE_FORMATS = [
 ]
 
 # OCR settings
+# OCR engine module name under services/ (without .py), e.g. OCR_Engine_AAA -> services/OCR_Engine_AAA.py
+OCR_ENGINE = "ocr_engine_paddle"
+# Backward-compatible alias for typo usage.
+ORC_ENGINE = OCR_ENGINE
+
 OCR_USE_GPU = False
 OCR_LANG = "ch"  # PaddleOCR language code for traditional Chinese
 OCR_DROP_SCORE = 0  # Keep more low-confidence candidates to reduce missed words

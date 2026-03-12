@@ -86,7 +86,11 @@ OCR/
 │   └── crop_region.py      # Crop region model
 ├── services/              # Business logic
 │   ├── image_processor.py  # Image preprocessing
-│   ├── ocr_engine.py       # OCR operations
+│   ├── ocr_base.py         # Shared OCR engine pipeline
+│   ├── ocr_shared.py       # Shared OCR post-processing utilities
+│   ├── ocr_engine_paddle.py # PaddleOCR engine implementation
+│   ├── ocr_engine_easyocr.py # EasyOCR engine implementation
+│   ├── text_corrector.py   # Shared pycorrector post-correction
 │   ├── pdf_handler.py      # PDF processing
 │   └── file_manager.py     # File I/O operations
 ├── ui/                    # User interface

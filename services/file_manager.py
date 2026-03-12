@@ -2,10 +2,8 @@
 File management service
 """
 import os
-import shutil
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
-from typing import List
 import config
 from models.image_data import ImageData
 
@@ -110,7 +108,7 @@ class FileManager:
             try:
                 # Try to use a larger font
                 font = ImageFont.truetype("arial.ttf", 40)
-            except:
+            except Exception:
                 # Fallback to default font
                 font = ImageFont.load_default()
             
