@@ -20,6 +20,9 @@ A Python application for OCR processing of traditional Chinese old newspapers wi
 - **Real-time Preview**: View OCR results before saving
 - **Batch Processing**: Process multiple images with background queue
 - **Comprehensive Output**: Saves annotated image and OCR text
+- **Pluggable OCR Engines**: Switch OCR backend via config (PaddleOCR or EasyOCR module)
+- **Traditional Chinese Enforcement**: Optional OpenCC final conversion pipeline
+- **OCR Flow Controls**: Pause, resume, or stop queued OCR tasks
 
 ## Installation
 
@@ -37,10 +40,10 @@ A Python application for OCR processing of traditional Chinese old newspapers wi
 pip install -r requirements.txt
 ```
 
-3. For PDF support, you may need to install Poppler:
-   - Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/
-   - Linux: `sudo apt-get install poppler-utils`
-   - MacOS: `brew install poppler`
+3. Optional engine dependency (only needed if you switch to EasyOCR):
+```bash
+pip install easyocr
+```
 
 ## Usage
 
@@ -52,7 +55,7 @@ python main.py
 2. Import files:
    - Click "Import Files" button
    - Select one or multiple image files or PDFs
-   - For PDFs, choose whether to import all pages
+   - For PDFs, choose whether to import all pages or enter specific pages (e.g. 1,3,5-7)
    - Or press Ctrl+V to paste images from the clipboard
 
 3. Process images:
@@ -73,31 +76,31 @@ python main.py
 
 ```
 OCR/
-├── App Screenshot.jpg     # UI cover image
-├── instruction.md         # Original requirements
-├── main.py                # Application entry point
-├── config.py              # Configuration settings
-├── requirements.txt       # Python dependencies
-├── run.bat                # Run script (Windows)
-├── setup.bat              # Setup script (Windows)
-├── setup.py               # Packaging/setup metadata
-├── models/                # Data models
-│   ├── image_data.py       # Image data model
-│   └── crop_region.py      # Crop region model
-├── services/              # Business logic
-│   ├── image_processor.py  # Image preprocessing
-│   ├── ocr_base.py         # Shared OCR engine pipeline
-│   ├── ocr_shared.py       # Shared OCR post-processing utilities
-│   ├── ocr_engine_paddle.py # PaddleOCR engine implementation
-│   ├── ocr_engine_easyocr.py # EasyOCR engine implementation
-│   ├── text_corrector.py   # Shared pycorrector post-correction
-│   ├── pdf_handler.py      # PDF processing
-│   └── file_manager.py     # File I/O operations
-├── ui/                    # User interface
-│   ├── main_window.py      # Main application window
-│   ├── image_canvas.py     # Image display and cropping
-│   └── crop_list_panel.py  # Crop management panel
-└── output/                # Output folder (created automatically)
+├── App Screenshot.jpg           # UI cover image
+├── instruction.md               # Original requirements
+├── main.py                      # Application entry point
+├── config.py                    # Configuration settings
+├── requirements.txt             # Python dependencies
+├── run.bat                      # Run script (Windows)
+├── setup.bat                    # Setup script (Windows)
+├── setup.py                     # Packaging/setup metadata
+├── models/                      # Data models
+│   ├── image_data.py            # Image data model
+│   └── crop_region.py           # Crop region model
+├── services/                    # Business logic
+│   ├── image_processor.py       # Image preprocessing
+│   ├── ocr_base.py              # Shared OCR engine pipeline
+│   ├── ocr_shared.py            # Shared OCR post-processing utilities
+│   ├── ocr_engine_paddle.py     # PaddleOCR engine implementation
+│   ├── ocr_engine_easyocr.py    # EasyOCR engine implementation
+│   ├── text_corrector.py        # Shared pycorrector post-correction
+│   ├── pdf_handler.py           # PDF processing
+│   └── file_manager.py          # File I/O operations
+├── ui/                          # User interface
+│   ├── main_window.py           # Main application window
+│   ├── image_canvas.py          # Image display and cropping
+│   └── crop_list_panel.py       # Crop management panel
+└── output/                      # Output folder (created automatically)
 ```
 
 ## Configuration
@@ -105,8 +108,20 @@ OCR/
 Edit `config.py` to customize:
 - Default language and reading direction
 - UI colors and sizes
-- OCR settings (GPU usage, language models)
+- OCR settings (GPU usage, thresholds, unknown-token behavior)
+- OCR backend module selection via `OCR_ENGINE`
 - Output formats
+
+### OCR Engine Switching
+
+Set the engine module in `config.py`:
+
+```python
+OCR_ENGINE = "ocr_engine_paddle"   # default
+# OCR_ENGINE = "ocr_engine_easyocr"  # optional engine
+```
+
+Engine modules are loaded dynamically from `services/` and each engine must expose an `OCREngine` class.
 
 ## Supported Formats
 
@@ -116,11 +131,16 @@ Edit `config.py` to customize:
 ## Requirements
 
 See `requirements.txt` for detailed dependencies:
-- PaddleOCR (OCR engine)
+- PaddleOCR + PaddlePaddle (default OCR engine)
 - CustomTkinter (Modern UI)
 - OpenCV (Image processing)
 - PyMuPDF (PDF handling)
 - Pillow (Image manipulation)
+- OpenCC (Traditional Chinese conversion)
+- pycorrector (OCR text post-correction)
+
+Optional dependency:
+- EasyOCR (only if `OCR_ENGINE = "ocr_engine_easyocr"`)
 
 ## Troubleshooting
 
@@ -128,10 +148,12 @@ See `requirements.txt` for detailed dependencies:
 - Ensure PaddlePaddle and PaddleOCR are properly installed
 - Check if the language model is downloaded (happens automatically on first run)
 - For GPU support, install paddlepaddle-gpu instead
+- If using EasyOCR, install it separately with `pip install easyocr`
 
 ### PDF Import Issues
-- Verify Poppler is installed and accessible
+- Verify PyMuPDF is installed correctly (`pip install PyMuPDF`)
 - Check PDF file is not corrupted or password-protected
+- Try selecting fewer pages first to isolate problematic pages
 
 ### Performance Issues
 - Reduce image resolution before processing
@@ -145,4 +167,6 @@ This project is for educational and personal use.
 ## Acknowledgments
 
 - PaddleOCR for the excellent OCR engine
+- EasyOCR for optional OCR backend support
+- OpenCC for Traditional Chinese conversion
 - CustomTkinter for the modern UI framework
