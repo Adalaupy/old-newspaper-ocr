@@ -358,18 +358,134 @@ class MainWindow(ctk.CTk):
             raise ValueError("PDF has no pages or is corrupted")
         
         # Simple dialog to select pages (for now, import all)
-        # TODO: Add page selection dialog
         response = messagebox.askyesno(
             "Import PDF",
             f"PDF has {page_count} pages. Import all pages?"
         )
-        
+
         if response:
             pages = PDFHandler.extract_all_pages(filepath)
-            for page_num, page_image in pages:
-                image_index = len(self.image_batch)
-                image_data = ImageData(filepath, page_image, page_number=page_num + 1, image_index=image_index)
-                self.image_batch.append(image_data)
+        else:
+            page_spec = self._prompt_pdf_page_selection(page_count)
+
+            if page_spec is None:
+                return
+
+            try:
+                selected_pages = self._parse_pdf_page_selection(page_spec, page_count)
+            except ValueError as e:
+                messagebox.showerror("Invalid Page Selection", str(e))
+                return
+
+            pages = PDFHandler.extract_pages(filepath, selected_pages)
+
+        for page_num, page_image in pages:
+            image_index = len(self.image_batch)
+            image_data = ImageData(filepath, page_image, page_number=page_num + 1, image_index=image_index)
+            self.image_batch.append(image_data)
+
+    def _parse_pdf_page_selection(self, page_spec: str, page_count: int) -> List[int]:
+        """Parse page input like '1,3,5-7' into zero-based page indices."""
+        if page_spec is None:
+            raise ValueError("No page selection was provided.")
+
+        selected_pages = []
+        seen = set()
+
+        for part in page_spec.split(','):
+            token = part.strip()
+            if not token:
+                continue
+
+            if '-' in token:
+                bounds = [p.strip() for p in token.split('-', 1)]
+                if len(bounds) != 2 or not bounds[0] or not bounds[1]:
+                    raise ValueError(f"Invalid range: '{token}'")
+
+                try:
+                    start = int(bounds[0])
+                    end = int(bounds[1])
+                except ValueError as e:
+                    raise ValueError(f"Invalid range: '{token}'") from e
+
+                if start > end:
+                    raise ValueError(f"Invalid range: '{token}' (start must be <= end)")
+
+                for page in range(start, end + 1):
+                    if page < 1 or page > page_count:
+                        raise ValueError(f"Page {page} is out of range (1-{page_count}).")
+                    zero_based = page - 1
+                    if zero_based not in seen:
+                        selected_pages.append(zero_based)
+                        seen.add(zero_based)
+            else:
+                try:
+                    page = int(token)
+                except ValueError as e:
+                    raise ValueError(f"Invalid page number: '{token}'") from e
+
+                if page < 1 or page > page_count:
+                    raise ValueError(f"Page {page} is out of range (1-{page_count}).")
+
+                zero_based = page - 1
+                if zero_based not in seen:
+                    selected_pages.append(zero_based)
+                    seen.add(zero_based)
+
+        if not selected_pages:
+            raise ValueError("No valid pages selected.")
+
+        return selected_pages
+
+    def _prompt_pdf_page_selection(self, page_count: int) -> Optional[str]:
+        """Show a larger dialog for selecting PDF pages."""
+        result = {"value": None}
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Import PDF Pages")
+        dialog.geometry("560x260")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text=f"Select pages to import (1-{page_count})",
+            font=("Arial", 16, "bold")
+        ).pack(pady=(16, 8))
+
+        ctk.CTkLabel(
+            dialog,
+            text="Use commas and ranges, e.g. 1,3,5-7",
+            font=("Arial", 12)
+        ).pack(pady=(0, 8))
+
+        page_var = ctk.StringVar()
+        entry = ctk.CTkEntry(dialog, textvariable=page_var, width=500, height=36)
+        entry.pack(pady=(4, 12), padx=20)
+        entry.focus_set()
+
+        def on_ok():
+            value = page_var.get().strip()
+            result["value"] = value if value else None
+            dialog.destroy()
+
+        def on_cancel():
+            result["value"] = None
+            dialog.destroy()
+
+        button_frame = ctk.CTkFrame(dialog)
+        button_frame.pack(pady=(4, 14))
+
+        ctk.CTkButton(button_frame, text="Import", width=120, command=on_ok).pack(side="left", padx=8)
+        ctk.CTkButton(button_frame, text="Cancel", width=120, command=on_cancel).pack(side="left", padx=8)
+
+        dialog.bind("<Return>", lambda event: on_ok())
+        dialog.bind("<Escape>", lambda event: on_cancel())
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+
+        self.wait_window(dialog)
+        return result["value"]
     
     def _load_current_image(self):
         """Load the current image to canvas"""
