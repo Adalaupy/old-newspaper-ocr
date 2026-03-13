@@ -18,7 +18,7 @@ A desktop OCR tool for old newspaper workflows: import images/PDF pages, crop ta
 
 - PaddleOCR: local OCR, sorted by detection position, exported as paragraph-style text
 - EasyOCR: local OCR, direct text extraction
-- Mistral OCR: API OCR via `MISTRAL_API_KEY`
+- Mistral OCR: API OCR via `MISTRAL_API_KEY`, using original crop images and strict transcription-oriented extraction
 
 The active engine can be changed from:
 - UI: `Settings -> OCR Engine`
@@ -93,6 +93,22 @@ ORC_ENGINE = OCR_ENGINE
 - `OCR_ENFORCE_TRADITIONAL_CHINESE`: final OpenCC conversion toggle
 - `OCR_TRADITIONAL_CONVERSION`: OpenCC conversion profile
 - Mistral-specific settings: `OCR_MISTRAL_MODEL`, `OCR_MISTRAL_LANGUAGE_HINT_ENABLED`, `OCR_MISTRAL_LANGUAGE_HINT`
+- Mistral accuracy settings: `OCR_MISTRAL_REQUEST_DOCUMENT_ANNOTATION`, `OCR_MISTRAL_STRICT_TRANSCRIPTION`, `OCR_MISTRAL_CLEAN_MARKDOWN_FALLBACK`, `OCR_MISTRAL_APPLY_PYCORRECTOR`
+
+### Mistral accuracy defaults
+
+```python
+OCR_MISTRAL_REQUEST_DOCUMENT_ANNOTATION = True
+OCR_MISTRAL_STRICT_TRANSCRIPTION = True
+OCR_MISTRAL_CLEAN_MARKDOWN_FALLBACK = True
+OCR_MISTRAL_APPLY_PYCORRECTOR = False
+```
+
+These defaults are intended to reduce common failure modes in old newspaper scans:
+
+- Prefer structured `document_annotation.text` before markdown-style page output
+- Keep Mistral from reformatting paragraphs into bullets or headings
+- Avoid pycorrector changing already-correct OCR text from the Mistral model
 
 ## Project Structure
 
@@ -128,6 +144,7 @@ OCR/
 ### Engine init errors
 
 - PaddleOCR/EasyOCR model download may run on first startup; wait for completion.
+- Switching to PaddleOCR is slow the first time because model initialization is heavy; later switches should be faster because the app reuses cached engine instances.
 - For Mistral OCR, verify `.env` exists and `MISTRAL_API_KEY` is set.
 - If switching engines fails from UI, stop active OCR processing first.
 
@@ -136,6 +153,9 @@ OCR/
 - Adjust crop size to include full characters and margins.
 - Try switching OCR engine from UI settings.
 - Tune language (`OCR_LANG`) and Mistral hint settings in `config.py`.
+- For Mistral OCR, prefer larger crops with full paragraph context instead of very tight character cuts.
+- If Mistral starts drifting on later crops, set `OCR_MISTRAL_LANGUAGE_HINT` explicitly, for example `Traditional Chinese`.
+- If Mistral output is too aggressively normalized, keep `OCR_MISTRAL_APPLY_PYCORRECTOR = False`.
 
 ## License
 

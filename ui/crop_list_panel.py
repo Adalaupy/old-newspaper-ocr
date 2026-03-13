@@ -140,11 +140,11 @@ class CropListPanel(ctk.CTkFrame):
             new_order = list(range(len(self.crop_regions)))
             new_order[self.selected_index], new_order[self.selected_index - 1] = \
                 new_order[self.selected_index - 1], new_order[self.selected_index]
-            
+            new_index = self.selected_index - 1
             if self.on_reorder:
                 self.on_reorder(new_order)
-            
-            self.selected_index -= 1
+            self.selected_index = new_index
+            self._refresh_list()
     
     def _on_move_down(self):
         """Move selected crop down in order"""
@@ -154,11 +154,11 @@ class CropListPanel(ctk.CTkFrame):
             new_order = list(range(len(self.crop_regions)))
             new_order[self.selected_index], new_order[self.selected_index + 1] = \
                 new_order[self.selected_index + 1], new_order[self.selected_index]
-            
+            new_index = self.selected_index + 1
             if self.on_reorder:
                 self.on_reorder(new_order)
-            
-            self.selected_index += 1
+            self.selected_index = new_index
+            self._refresh_list()
     
     def _update_button_states(self):
         """Update button enabled/disabled states"""

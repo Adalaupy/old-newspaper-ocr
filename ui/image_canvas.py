@@ -76,12 +76,14 @@ class ImageCanvas(ctk.CTkFrame):
             image: PIL Image to display
             crop_regions: List of CropRegion objects
         """
+        is_same_image = image is self.original_image
         self.original_image = image
         self.crop_regions = crop_regions or []
-        self.zoom_level = 1.0
-        self.pan_offset_x = 0
-        self.pan_offset_y = 0
-        self.selected_crop_index = None
+        if not is_same_image:
+            self.zoom_level = 1.0
+            self.pan_offset_x = 0
+            self.pan_offset_y = 0
+            self.selected_crop_index = None
         self._update_display()
 
     def clear_image(self):

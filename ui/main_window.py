@@ -12,7 +12,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 import config
 from models import ImageData, CropRegion
-from services import ImageProcessor, PDFHandler, FileManager, create_ocr_engine
+from services import ImageProcessor, PDFHandler, FileManager, create_ocr_engine, create_ocr_engine_from_module
 
 from ui.image_canvas import ImageCanvas
 from ui.crop_list_panel import CropListPanel
@@ -36,6 +36,9 @@ class MainWindow(ctk.CTk):
         self.image_batch: List[ImageData] = []
         self.current_image_index = 0
         self.ocr_engine: Optional["BaseOCREngine"] = None
+        self._engine_cache: dict[str, "BaseOCREngine"] = {}
+        self._engine_cache_lock = threading.Lock()
+        self._active_engine_key: str = ""
         self.processing_queue = queue.Queue()
         self.processing_paused = threading.Event()
         self.processing_paused.set()
@@ -49,7 +52,10 @@ class MainWindow(ctk.CTk):
         # Setup UI
         self._setup_ui()
         self._setup_menu()
-        self.bind_all("<Control-v>", self._paste_image)
+        self._bind_global_shortcuts()
+
+        # Prewarm heavy engines in background so first switch is faster.
+        self._prewarm_ocr_engines_async()
         
         # Start background processor
         self._start_background_processor()
@@ -65,7 +71,7 @@ class MainWindow(ctk.CTk):
     def _init_services(self):
         """Initialize service objects"""
         try:
-            self.ocr_engine = create_ocr_engine()
+            self._reload_ocr_engine()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to initialize OCR engine: {e}")
     
@@ -266,6 +272,28 @@ class MainWindow(ctk.CTk):
         """Setup menu bar (if needed)"""
         # CustomTkinter doesn't have native menu, so we skip or use buttons
         pass
+
+    def _bind_global_shortcuts(self):
+        """Bind application-wide keyboard and mouse shortcuts."""
+        self.bind_all("<Control-v>", self._paste_image)
+        self.bind_all("<Control-MouseWheel>", self._on_zoom_shortcut)
+        self.bind_all("<Control-Button-4>", self._on_zoom_shortcut)
+        self.bind_all("<Control-Button-5>", self._on_zoom_shortcut)
+
+    def _on_zoom_shortcut(self, event):
+        """Zoom the current image with Ctrl + mouse wheel."""
+        if not self.image_batch:
+            return "break"
+
+        delta = getattr(event, "delta", 0)
+        button_num = getattr(event, "num", None)
+
+        if delta > 0 or button_num == 4:
+            self._zoom_in()
+        elif delta < 0 or button_num == 5:
+            self._zoom_out()
+
+        return "break"
     
     def _import_files(self):
         """Import image or PDF files"""
@@ -558,6 +586,11 @@ class MainWindow(ctk.CTk):
             image_data = self.image_batch[self.current_image_index]
             image_data.language = choice
 
+    @staticmethod
+    def _engine_cache_key(engine_module: str) -> str:
+        """Build a stable cache key for an OCR engine module name."""
+        return str(engine_module or "").strip().lower()
+
     def _get_current_engine_label(self) -> str:
         """Return the UI label for the currently configured OCR engine."""
         current_engine = getattr(config, "OCR_ENGINE", "")
@@ -567,8 +600,47 @@ class MainWindow(ctk.CTk):
         return next(iter(config.OCR_ENGINE_OPTIONS))
 
     def _reload_ocr_engine(self):
-        """Recreate the OCR engine instance from current config."""
-        self.ocr_engine = create_ocr_engine()
+        """Load OCR engine from cache or create it if needed."""
+        engine_module = getattr(config, "OCR_ENGINE", "")
+        engine_key = self._engine_cache_key(engine_module)
+
+        with self._engine_cache_lock:
+            cached_engine = self._engine_cache.get(engine_key)
+        if cached_engine is not None:
+            self.ocr_engine = cached_engine
+            self._active_engine_key = engine_key
+            return False
+
+        engine_instance = create_ocr_engine()
+        with self._engine_cache_lock:
+            self._engine_cache[engine_key] = engine_instance
+        self.ocr_engine = engine_instance
+        self._active_engine_key = engine_key
+        return True
+
+    def _prewarm_ocr_engines_async(self):
+        """Warm up heavy OCR engines in background to reduce first-switch latency."""
+        paddle_module = config.OCR_ENGINE_OPTIONS.get("PaddleOCR")
+        if not paddle_module:
+            return
+
+        paddle_key = self._engine_cache_key(paddle_module)
+
+        def prewarm():
+            try:
+                with self._engine_cache_lock:
+                    if paddle_key in self._engine_cache:
+                        return
+
+                engine_instance = create_ocr_engine_from_module(paddle_module)
+
+                with self._engine_cache_lock:
+                    self._engine_cache.setdefault(paddle_key, engine_instance)
+            except Exception as e:
+                print(f"Paddle prewarm skipped: {e}")
+
+        thread = threading.Thread(target=prewarm, daemon=True)
+        thread.start()
 
     def _on_engine_changed(self, choice):
         """Handle OCR engine change from the UI."""
@@ -583,11 +655,16 @@ class MainWindow(ctk.CTk):
             return
 
         previous_engine = config.OCR_ENGINE
+        if selected_engine == previous_engine:
+            self.engine_var.set(choice)
+            self.progress_label.configure(text=f"OCR engine: {choice}")
+            return
+
         config.OCR_ENGINE = selected_engine
         config.ORC_ENGINE = selected_engine
 
         try:
-            self._reload_ocr_engine()
+            created = self._reload_ocr_engine()
         except Exception as e:
             config.OCR_ENGINE = previous_engine
             config.ORC_ENGINE = previous_engine
@@ -599,7 +676,10 @@ class MainWindow(ctk.CTk):
             self._mark_image_pending(image_data)
 
         self.engine_var.set(choice)
-        self.progress_label.configure(text=f"OCR engine: {choice}")
+        if created:
+            self.progress_label.configure(text=f"OCR engine: {choice} (initialized)")
+        else:
+            self.progress_label.configure(text=f"OCR engine: {choice} (cached)")
     
     def _on_read_dir_changed(self, choice):
         """Handle reading direction change"""
@@ -682,8 +762,12 @@ class MainWindow(ctk.CTk):
                 queued_count += 1
 
         if queued_count == 0:
-            self.progress_label.configure(text="No pending OCR tasks")
-            return
+            for image_data in self.image_batch:
+                image_data.is_processed = False
+                self.processing_queue.put(image_data)
+                queued_count += 1
+
+            self.progress_label.configure(text="Reprocessing all OCR tasks...")
 
         self.stop_requested.clear()
         self.processing_paused.set()
@@ -826,8 +910,13 @@ class MainWindow(ctk.CTk):
                 #     except Exception as language_error:
                 #         print(f"Warning: failed to set runtime OCR language: {language_error}")
                 
-                # Preprocess
-                processed_img = ImageProcessor.preprocess(cropped_img)
+                # Mistral OCR is vision-native and often degrades with hard binarization.
+                # Keep original crop for Mistral; preprocess for local OCR engines.
+                engine_module_name = getattr(self.ocr_engine.__class__, "__module__", "")
+                if "ocr_engine_mistral" in engine_module_name:
+                    processed_img = cropped_img
+                else:
+                    processed_img = ImageProcessor.preprocess(cropped_img)
                 
                 # Perform OCR
                 text = self.ocr_engine.recognize_text(processed_img, image_data.read_direction)

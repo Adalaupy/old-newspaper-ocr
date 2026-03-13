@@ -63,5 +63,8 @@ def split_markdown_lines(markdown_text: str, ignored_prefixes: tuple[str, ...] =
             continue
         if any(normalized_line.startswith(prefix) for prefix in ignored_prefixes):
             continue
+        # Skip markdown table rows (| cell | cell |) and separator lines (| --- |)
+        if normalized_line.startswith("|"):
+            continue
         lines.append(normalized_line)
     return lines

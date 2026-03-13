@@ -2,7 +2,9 @@
 OCR Engine service using Mistral OCR API.
 """
 import importlib
+import json
 import os
+import re
 
 from PIL import Image
 
@@ -41,7 +43,7 @@ class OCREngine(BaseOCREngine):
         }
 
         language_hint = self._resolve_language_hint()
-        if language_hint and getattr(config, "OCR_MISTRAL_LANGUAGE_HINT_ENABLED", True):
+        if getattr(config, "OCR_MISTRAL_REQUEST_DOCUMENT_ANNOTATION", True):
             request_kwargs["document_annotation_format"] = {
                 "type": "json_schema",
                 "json_schema": {
@@ -56,19 +58,27 @@ class OCREngine(BaseOCREngine):
                     },
                 },
             }
-            request_kwargs["document_annotation_prompt"] = (
-                "The document language is expected to be "
-                f"{language_hint}. Extract OCR text faithfully and return only that text in the field `text`."
-            )
+            request_kwargs["document_annotation_prompt"] = self._build_annotation_prompt(language_hint)
 
         response = self.client.ocr.process(**request_kwargs)
         payload = self._response_to_dict(response)
 
-        lines = []
-        for page in payload.get("pages", []):
-            lines.extend(split_markdown_lines(self._get_page_markdown(page)))
+        annotation_text = ""
+        if getattr(config, "OCR_MISTRAL_REQUEST_DOCUMENT_ANNOTATION", True):
+            annotation_text = self._extract_document_annotation_text(payload)
+
+        if annotation_text:
+            lines = split_markdown_lines(annotation_text)
+        else:
+            lines = []
+            for page in payload.get("pages", []):
+                lines.extend(self._clean_markdown_fallback_lines(self._get_page_markdown(page)))
 
         return self._finalize_text("\n".join(lines))
+
+    def _should_apply_text_correction(self) -> bool:
+        """Keep Mistral output unmodified unless explicitly enabled."""
+        return bool(getattr(config, "OCR_MISTRAL_APPLY_PYCORRECTOR", False))
 
     @staticmethod
     def _response_to_dict(response) -> dict:
@@ -93,7 +103,11 @@ class OCREngine(BaseOCREngine):
 
         pages = getattr(response, "pages", None)
         if pages is not None:
-            return {"pages": pages}
+            payload = {"pages": pages}
+            annotation = getattr(response, "document_annotation", None)
+            if annotation is not None:
+                payload["document_annotation"] = annotation
+            return payload
 
         return {}
 
@@ -105,6 +119,93 @@ class OCREngine(BaseOCREngine):
         if isinstance(page, dict):
             return page.get("markdown", "")
         return getattr(page, "markdown", "")
+
+    @staticmethod
+    def _extract_document_annotation_text(payload: dict) -> str:
+        """Extract plain text from document_annotation payload when available."""
+        annotation = payload.get("document_annotation")
+        if annotation is None:
+            return ""
+
+        if isinstance(annotation, str):
+            stripped = annotation.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, dict):
+                        value = parsed.get("text")
+                        if isinstance(value, str) and value.strip():
+                            return value
+                except Exception:
+                    # Some responses contain raw newlines in JSON-like strings.
+                    try:
+                        sanitized = stripped.replace("\r\n", "\\n").replace("\n", "\\n")
+                        parsed = json.loads(sanitized)
+                        if isinstance(parsed, dict):
+                            value = parsed.get("text")
+                            if isinstance(value, str) and value.strip():
+                                return value
+                    except Exception:
+                        pass
+            return annotation
+
+        if isinstance(annotation, dict):
+            value = annotation.get("text")
+            if isinstance(value, str) and value.strip():
+                return value
+
+        return ""
+
+    @staticmethod
+    def _build_annotation_prompt(language_hint: str) -> str:
+        """Build a strict transcription prompt for Mistral OCR."""
+        prompt_parts = []
+        if language_hint and getattr(config, "OCR_MISTRAL_LANGUAGE_HINT_ENABLED", True):
+            prompt_parts.append(f"The document language is expected to be {language_hint}.")
+
+        if getattr(config, "OCR_MISTRAL_STRICT_TRANSCRIPTION", True):
+            prompt_parts.append(
+                "Transcribe the document exactly as written. Do not summarize, infer missing words, "
+                "translate, reorder content, or convert paragraphs into bullet points. Preserve reading "
+                "order, punctuation, numbers, and line breaks. Return only the exact transcription in the field `text`."
+            )
+        else:
+            prompt_parts.append(
+                "Extract OCR text faithfully and return only that text in the field `text`."
+            )
+
+        return " ".join(prompt_parts)
+
+    @classmethod
+    def _clean_markdown_fallback_lines(cls, markdown_text: str) -> list[str]:
+        """Normalize markdown fallback text into cleaner plain-text lines."""
+        lines = split_markdown_lines(markdown_text)
+        if not getattr(config, "OCR_MISTRAL_CLEAN_MARKDOWN_FALLBACK", True):
+            return lines
+
+        cleaned_lines = []
+        for line in lines:
+            normalized_line = cls._strip_markdown_prefix(line)
+            if normalized_line:
+                cleaned_lines.append(normalized_line)
+        return cleaned_lines
+
+    @staticmethod
+    def _strip_markdown_prefix(line: str) -> str:
+        """Remove markdown list and heading markers from fallback OCR text."""
+        normalized_line = str(line).strip()
+        if not normalized_line:
+            return ""
+
+        # Drop markdown table rows and separator lines entirely
+        if normalized_line.startswith("|"):
+            return ""
+
+        normalized_line = re.sub(r"^#{1,6}\s+", "", normalized_line)
+        normalized_line = re.sub(r"^>\s+", "", normalized_line)
+        normalized_line = re.sub(r"^[-*+]\s+", "", normalized_line)
+        normalized_line = re.sub(r"^\d+[.)]\s+", "", normalized_line)
+        return normalized_line.strip()
 
     def _resolve_language_hint(self) -> str:
         """Resolve language hint from config when enabled."""

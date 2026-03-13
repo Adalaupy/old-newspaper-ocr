@@ -26,9 +26,8 @@ def _normalize_engine_module_name(engine_module_name: str) -> str:
     return normalized
 
 
-def _load_ocr_engine_class():
-    """Load OCREngine class from the configured engine module."""
-    engine_module_name = getattr(config, "OCR_ENGINE", None) or getattr(config, "ORC_ENGINE", "ocr_engine_paddle")
+def _load_ocr_engine_class_from_module(engine_module_name: str):
+    """Load OCREngine class from a specific engine module name."""
     engine_module_name = _normalize_engine_module_name(engine_module_name)
 
     candidate_modules = [engine_module_name]
@@ -51,11 +50,29 @@ def _load_ocr_engine_class():
     ) from last_error
 
 
+def _load_ocr_engine_class():
+    """Load OCREngine class from the configured engine module."""
+    engine_module_name = getattr(config, "OCR_ENGINE", None) or getattr(config, "ORC_ENGINE", "ocr_engine_paddle")
+    return _load_ocr_engine_class_from_module(engine_module_name)
+
+
 def create_ocr_engine():
     """Create a fresh OCR engine instance from the current config."""
     return _load_ocr_engine_class()()
 
 
+def create_ocr_engine_from_module(engine_module_name: str):
+    """Create a fresh OCR engine instance from a specific module name."""
+    return _load_ocr_engine_class_from_module(engine_module_name)()
+
+
 OCREngine = _load_ocr_engine_class()
 
-__all__ = ['ImageProcessor', 'OCREngine', 'PDFHandler', 'FileManager', 'create_ocr_engine']
+__all__ = [
+    'ImageProcessor',
+    'OCREngine',
+    'PDFHandler',
+    'FileManager',
+    'create_ocr_engine',
+    'create_ocr_engine_from_module',
+]
