@@ -8,13 +8,12 @@ from PIL import Image
 
 import config
 from services.ocr.ocr_shared import ensure_traditional_chinese
-from services.ocr.ocr_shared import format_text_by_direction
 from services.ocr.ocr_shared import initialize_opencc_converter
 from services.text_corrector import correct_ocr_text
 
 
 class BaseOCREngine(ABC):
-    """Reusable OCR engine base with common text post-processing flow."""
+    """Reusable OCR engine base with shared final text post-processing."""
 
     def __init__(self):
         self.opencc_converter = initialize_opencc_converter()
@@ -25,47 +24,25 @@ class BaseOCREngine(ABC):
         """Initialize the underlying OCR backend."""
 
     @abstractmethod
-    def _run_ocr(self, image: Image.Image):
-        """Run OCR backend and return raw backend-specific result."""
-
-    @abstractmethod
-    def _normalize_ocr_result(self, result) -> list:
-        """Normalize backend-specific OCR result into standard line schema."""
-
     def recognize_text(self, image: Image.Image, read_direction: str = "vertical_rtl") -> str:
-        """
-        Shared recognition pipeline for all engines.
+        """Run OCR on the image and return final extracted text."""
 
-        Returns recognized text as a string.
-        """
-        prepared_image = self._ensure_rgb(image)
-
-        try:
-            raw_result = self._run_ocr(prepared_image)
-        except Exception as e:
-            print(f"OCR processing failed: {e}")
+    def _finalize_text(self, text: str) -> str:
+        """Apply shared cleanup and final text conversion."""
+        final_text = "" if text is None else str(text).strip()
+        if not final_text:
             return config.OCR_UNKNOWN_TOKEN
 
         try:
-            normalized = self._normalize_ocr_result(raw_result)
+            final_text = correct_ocr_text(final_text)
         except Exception as e:
-            print(f"OCR normalize failed: {e}")
+            print(f"OCR post-processing failed: {e}")
             return config.OCR_UNKNOWN_TOKEN
 
-        if not normalized:
+        if not final_text.strip():
             return config.OCR_UNKNOWN_TOKEN
 
-        try:
-            text = format_text_by_direction(normalized, read_direction)
-            text = correct_ocr_text(text)
-        except Exception as e:
-            print(f"OCR format failed: {e}")
-            return config.OCR_UNKNOWN_TOKEN
-
-        if not text.strip():
-            return config.OCR_UNKNOWN_TOKEN
-
-        return ensure_traditional_chinese(text, self.opencc_converter)
+        return ensure_traditional_chinese(final_text, self.opencc_converter)
 
     @staticmethod
     def _ensure_rgb(image: Image.Image) -> Image.Image:

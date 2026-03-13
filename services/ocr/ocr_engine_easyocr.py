@@ -3,10 +3,9 @@ OCR Engine service using EasyOCR
 """
 from PIL import Image
 import numpy as np
+
 import config
 from services.ocr.ocr_base import BaseOCREngine
-from services.ocr.ocr_shared import normalize_polygon_points
-from services.ocr.ocr_shared import to_float
 
 try:
     import easyocr
@@ -18,13 +17,11 @@ class OCREngine(BaseOCREngine):
     """Handles OCR operations using EasyOCR"""
 
     def _initialize_engine(self):
-        """Initialize EasyOCR reader"""
+        """Initialize EasyOCR reader."""
         if easyocr is None:
             raise ImportError("easyocr is not installed. Install it with: pip install easyocr")
 
         try:
-            lang_code = config.OCR_LANG
-
             lang_map = {
                 "ch": "ch_sim",
                 "chinese": "ch_sim",
@@ -32,53 +29,27 @@ class OCREngine(BaseOCREngine):
                 "en": "en",
                 "english": "en",
             }
-
-            easyocr_lang = lang_map.get(lang_code, "ch_sim")
-
-            gpu = config.OCR_USE_GPU
-            self.reader = easyocr.Reader([easyocr_lang], gpu=gpu)
+            easyocr_lang = lang_map.get(config.OCR_LANG, "ch_sim")
+            self.reader = easyocr.Reader([easyocr_lang], gpu=config.OCR_USE_GPU)
         except Exception as e:
             print(f"Error initializing EasyOCR engine: {e}")
             raise
 
-    def _run_ocr(self, image: Image.Image):
-        """Run EasyOCR and return raw backend result."""
+    def recognize_text(self, image: Image.Image, read_direction: str = "vertical_rtl") -> str:
+        """Run EasyOCR and return final extracted text."""
         if self.reader is None:
             raise RuntimeError("OCR engine not initialized")
 
-        img_array = np.array(image, dtype=np.uint8)
-        return self.reader.readtext(img_array)
+        prepared_image = self._ensure_rgb(image)
+        result = self.reader.readtext(np.array(prepared_image, dtype=np.uint8))
 
-    def _normalize_ocr_result(self, results: list) -> list:
-        """
-        Normalize EasyOCR results to internal format: [ [box, [text, confidence]], ... ]
-
-        EasyOCR returns: [(points, text, confidence), ...]
-        """
-        if not results:
-            return []
-
-        normalized = []
-        for item in results:
-            if not isinstance(item, (list, tuple)) or len(item) < 3:
+        lines = []
+        for item in result or []:
+            if not isinstance(item, (list, tuple)) or len(item) < 2:
                 continue
 
-            points = item[0]
-            text = item[1]
-            confidence = item[2]
+            text = "" if item[1] is None else str(item[1]).strip()
+            if text:
+                lines.append(text)
 
-            box = normalize_polygon_points(points)
-
-            if not box:
-                continue
-
-            if text is None:
-                text = ""
-            else:
-                text = str(text).strip()
-
-            conf = to_float(confidence, 0.0)
-
-            normalized.append([box, [text, conf]])
-
-        return normalized
+        return self._finalize_text("\n".join(lines))

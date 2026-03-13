@@ -58,6 +58,11 @@ SUPPORTED_IMAGE_FORMATS = [
 OCR_ENGINE = "ocr_engine_mistral"
 # Backward-compatible alias for typo usage.
 ORC_ENGINE = OCR_ENGINE
+OCR_ENGINE_OPTIONS = {
+    "PaddleOCR": "ocr_engine_paddle",
+    "EasyOCR": "ocr_engine_easyocr",
+    "Mistral OCR": "ocr_engine_mistral",
+}
 
 OCR_USE_GPU = False
 OCR_LANG = "ch"  # PaddleOCR language code for traditional Chinese

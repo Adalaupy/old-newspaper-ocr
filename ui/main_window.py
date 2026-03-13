@@ -12,7 +12,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 import config
 from models import ImageData, CropRegion
-from services import ImageProcessor, OCREngine, PDFHandler, FileManager
+from services import ImageProcessor, PDFHandler, FileManager, create_ocr_engine
 
 from ui.image_canvas import ImageCanvas
 from ui.crop_list_panel import CropListPanel
@@ -65,7 +65,7 @@ class MainWindow(ctk.CTk):
     def _init_services(self):
         """Initialize service objects"""
         try:
-            self.ocr_engine = OCREngine()
+            self.ocr_engine = create_ocr_engine()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to initialize OCR engine: {e}")
     
@@ -142,6 +142,17 @@ class MainWindow(ctk.CTk):
             command=self._on_language_changed
         )
         self.language_menu.pack(fill="x", padx=5, pady=2)
+
+        # OCR engine
+        ctk.CTkLabel(settings_frame, text="OCR Engine:").pack(anchor="w", padx=5, pady=(5,0))
+        self.engine_var = ctk.StringVar(value=self._get_current_engine_label())
+        self.engine_menu = ctk.CTkOptionMenu(
+            settings_frame,
+            values=list(config.OCR_ENGINE_OPTIONS.keys()),
+            variable=self.engine_var,
+            command=self._on_engine_changed
+        )
+        self.engine_menu.pack(fill="x", padx=5, pady=2)
         
         # Reading direction
         ctk.CTkLabel(settings_frame, text="Reading Direction:").pack(anchor="w", padx=5, pady=(5,0))
@@ -546,6 +557,49 @@ class MainWindow(ctk.CTk):
         if self.image_batch and self.current_image_index < len(self.image_batch):
             image_data = self.image_batch[self.current_image_index]
             image_data.language = choice
+
+    def _get_current_engine_label(self) -> str:
+        """Return the UI label for the currently configured OCR engine."""
+        current_engine = getattr(config, "OCR_ENGINE", "")
+        for label, engine_module in config.OCR_ENGINE_OPTIONS.items():
+            if engine_module == current_engine:
+                return label
+        return next(iter(config.OCR_ENGINE_OPTIONS))
+
+    def _reload_ocr_engine(self):
+        """Recreate the OCR engine instance from current config."""
+        self.ocr_engine = create_ocr_engine()
+
+    def _on_engine_changed(self, choice):
+        """Handle OCR engine change from the UI."""
+        if self.is_processing:
+            messagebox.showwarning("OCR Engine", "Stop OCR processing before switching engines.")
+            self.engine_var.set(self._get_current_engine_label())
+            return
+
+        selected_engine = config.OCR_ENGINE_OPTIONS.get(choice)
+        if not selected_engine:
+            self.engine_var.set(self._get_current_engine_label())
+            return
+
+        previous_engine = config.OCR_ENGINE
+        config.OCR_ENGINE = selected_engine
+        config.ORC_ENGINE = selected_engine
+
+        try:
+            self._reload_ocr_engine()
+        except Exception as e:
+            config.OCR_ENGINE = previous_engine
+            config.ORC_ENGINE = previous_engine
+            self.engine_var.set(self._get_current_engine_label())
+            messagebox.showerror("Error", f"Failed to switch OCR engine: {e}")
+            return
+
+        for image_data in self.image_batch:
+            self._mark_image_pending(image_data)
+
+        self.engine_var.set(choice)
+        self.progress_label.configure(text=f"OCR engine: {choice}")
     
     def _on_read_dir_changed(self, choice):
         """Handle reading direction change"""

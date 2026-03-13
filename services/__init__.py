@@ -51,6 +51,11 @@ def _load_ocr_engine_class():
     ) from last_error
 
 
+def create_ocr_engine():
+    """Create a fresh OCR engine instance from the current config."""
+    return _load_ocr_engine_class()()
+
+
 OCREngine = _load_ocr_engine_class()
 
-__all__ = ['ImageProcessor', 'OCREngine', 'PDFHandler', 'FileManager']
+__all__ = ['ImageProcessor', 'OCREngine', 'PDFHandler', 'FileManager', 'create_ocr_engine']
