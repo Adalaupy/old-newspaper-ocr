@@ -7,9 +7,9 @@ from abc import abstractmethod
 from PIL import Image
 
 import config
-from services.ocr_shared import ensure_traditional_chinese
-from services.ocr_shared import format_text_by_direction
-from services.ocr_shared import initialize_opencc_converter
+from services.ocr.ocr_shared import ensure_traditional_chinese
+from services.ocr.ocr_shared import format_text_by_direction
+from services.ocr.ocr_shared import initialize_opencc_converter
 from services.text_corrector import correct_ocr_text
 
 

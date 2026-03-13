@@ -18,7 +18,7 @@ from ui.image_canvas import ImageCanvas
 from ui.crop_list_panel import CropListPanel
 
 if TYPE_CHECKING:
-    from services.ocr_base import BaseOCREngine
+    from services.ocr.ocr_base import BaseOCREngine
 
 
 class MainWindow(ctk.CTk):
@@ -760,6 +760,17 @@ class MainWindow(ctk.CTk):
             try:
                 # Get cropped image
                 cropped_img = image_data.get_cropped_image(crop)
+
+                # Keep OCR language aligned with each image's selected language.
+                selected_language = image_data.language
+                selected_lang_code = config.SUPPORTED_LANGUAGES.get(selected_language, config.OCR_LANG)
+                config.OCR_LANG = selected_lang_code
+
+                # if hasattr(self.ocr_engine, "set_runtime_language"):
+                #     try:
+                #         self.ocr_engine.set_runtime_language(selected_language, selected_lang_code)
+                #     except Exception as language_error:
+                #         print(f"Warning: failed to set runtime OCR language: {language_error}")
                 
                 # Preprocess
                 processed_img = ImageProcessor.preprocess(cropped_img)

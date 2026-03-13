@@ -50,6 +50,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Local environment secrets
+.env
+
 # Test files
 test_*.py
 *_test.py

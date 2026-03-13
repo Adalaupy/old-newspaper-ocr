@@ -20,7 +20,7 @@ A Python application for OCR processing of traditional Chinese old newspapers wi
 - **Real-time Preview**: View OCR results before saving
 - **Batch Processing**: Process multiple images with background queue
 - **Comprehensive Output**: Saves annotated image and OCR text
-- **Pluggable OCR Engines**: Switch OCR backend via config (PaddleOCR or EasyOCR module)
+- **Pluggable OCR Engines**: Switch OCR backend via config (Mistral OCR, PaddleOCR, or EasyOCR module)
 - **Traditional Chinese Enforcement**: Optional OpenCC final conversion pipeline
 - **OCR Flow Controls**: Pause, resume, or stop queued OCR tasks
 
@@ -40,7 +40,15 @@ A Python application for OCR processing of traditional Chinese old newspapers wi
 pip install -r requirements.txt
 ```
 
-3. Optional engine dependency (only needed if you switch to EasyOCR):
+3. Configure API key for Mistral OCR engine:
+
+Create a `.env` file in project root:
+
+```bash
+MISTRAL_API_KEY=your_api_key_here
+```
+
+4. Optional engine dependency (only needed if you switch to EasyOCR):
 ```bash
 pip install easyocr
 ```
@@ -89,10 +97,12 @@ OCR/
 │   └── crop_region.py           # Crop region model
 ├── services/                    # Business logic
 │   ├── image_processor.py       # Image preprocessing
-│   ├── ocr_base.py              # Shared OCR engine pipeline
-│   ├── ocr_shared.py            # Shared OCR post-processing utilities
-│   ├── ocr_engine_paddle.py     # PaddleOCR engine implementation
-│   ├── ocr_engine_easyocr.py    # EasyOCR engine implementation
+│   ├── ocr/                     # OCR engine implementations
+│   │   ├── ocr_base.py          # Shared OCR engine pipeline
+│   │   ├── ocr_shared.py        # Shared OCR post-processing utilities
+│   │   ├── ocr_engine_paddle.py   # PaddleOCR engine implementation
+│   │   ├── ocr_engine_easyocr.py  # EasyOCR engine implementation
+│   │   └── ocr_engine_mistral.py  # Mistral OCR engine implementation
 │   ├── text_corrector.py        # Shared pycorrector post-correction
 │   ├── pdf_handler.py           # PDF processing
 │   └── file_manager.py          # File I/O operations
@@ -117,11 +127,12 @@ Edit `config.py` to customize:
 Set the engine module in `config.py`:
 
 ```python
-OCR_ENGINE = "ocr_engine_paddle"   # default
-# OCR_ENGINE = "ocr_engine_easyocr"  # optional engine
+OCR_ENGINE = "ocr_engine_paddle"    # default local on-device OCR
+# OCR_ENGINE = "ocr_engine_mistral" # API-based OCR
+# OCR_ENGINE = "ocr_engine_easyocr" # optional engine
 ```
 
-Engine modules are loaded dynamically from `services/` and each engine must expose an `OCREngine` class.
+Engine modules are loaded dynamically from `services/ocr/` and each engine must expose an `OCREngine` class.
 
 ## Supported Formats
 
@@ -131,7 +142,8 @@ Engine modules are loaded dynamically from `services/` and each engine must expo
 ## Requirements
 
 See `requirements.txt` for detailed dependencies:
-- PaddleOCR + PaddlePaddle (default OCR engine)
+- Mistral AI SDK (default OCR engine)
+- PaddleOCR + PaddlePaddle (optional local OCR engine)
 - CustomTkinter (Modern UI)
 - OpenCV (Image processing)
 - PyMuPDF (PDF handling)
@@ -148,6 +160,7 @@ Optional dependency:
 - Ensure PaddlePaddle and PaddleOCR are properly installed
 - Check if the language model is downloaded (happens automatically on first run)
 - For GPU support, install paddlepaddle-gpu instead
+- If using Mistral OCR, confirm `MISTRAL_API_KEY` is set in `.env`
 - If using EasyOCR, install it separately with `pip install easyocr`
 
 ### PDF Import Issues

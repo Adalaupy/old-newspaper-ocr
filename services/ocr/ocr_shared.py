@@ -1,7 +1,12 @@
 """
 Shared OCR post-processing utilities used by all OCR engines.
 """
+import base64
+import io
+
 import numpy as np
+from PIL import Image
+from PIL import ImageOps
 
 import config
 
@@ -188,3 +193,25 @@ def to_float(value, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def build_png_data_url(image: Image.Image) -> str:
+    """Convert a PIL image to a lossless PNG data URL."""
+    normalized_image = ImageOps.exif_transpose(image)
+    buffer = io.BytesIO()
+    normalized_image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{encoded}"
+
+
+def split_markdown_lines(markdown_text: str, ignored_prefixes: tuple[str, ...] = ("![img-", "[tbl-")) -> list:
+    """Split markdown into clean text lines and skip placeholder prefixes."""
+    lines = []
+    for line in str(markdown_text).splitlines():
+        normalized_line = line.strip()
+        if not normalized_line:
+            continue
+        if any(normalized_line.startswith(prefix) for prefix in ignored_prefixes):
+            continue
+        lines.append(normalized_line)
+    return lines

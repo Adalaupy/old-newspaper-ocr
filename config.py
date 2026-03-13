@@ -2,6 +2,15 @@
 Configuration file for OCR application
 """
 
+import os
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # Keep configuration import-safe even when python-dotenv is unavailable.
+    pass
+
 # Supported languages for OCR
 SUPPORTED_LANGUAGES = {
     "Traditional Chinese": "ch",
@@ -45,13 +54,18 @@ SUPPORTED_IMAGE_FORMATS = [
 ]
 
 # OCR settings
-# OCR engine module name under services/ (without .py), e.g. OCR_Engine_AAA -> services/OCR_Engine_AAA.py
-OCR_ENGINE = "ocr_engine_paddle"
+# OCR engine module name under services/ocr/, e.g. "ocr_engine_paddle" -> services/ocr/ocr_engine_paddle.py
+OCR_ENGINE = "ocr_engine_mistral"
 # Backward-compatible alias for typo usage.
 ORC_ENGINE = OCR_ENGINE
 
 OCR_USE_GPU = False
 OCR_LANG = "ch"  # PaddleOCR language code for traditional Chinese
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "").strip()
+OCR_MISTRAL_MODEL = "mistral-ocr-latest"
+OCR_MISTRAL_INCLUDE_IMAGE_BASE64 = True
+OCR_MISTRAL_LANGUAGE_HINT_ENABLED = True
+OCR_MISTRAL_LANGUAGE_HINT = ""  # Optional override, e.g. "Traditional Chinese"
 OCR_DROP_SCORE = 0  # Keep more low-confidence candidates to reduce missed words
 OCR_DET_DB_THRESH = 0.2  # Lower text detection threshold for faint newspaper print
 OCR_DET_DB_BOX_THRESH = 0.35  # Lower box confidence threshold to keep weak text boxes
