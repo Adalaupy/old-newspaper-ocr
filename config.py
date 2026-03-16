@@ -55,7 +55,7 @@ SUPPORTED_IMAGE_FORMATS = [
 
 # OCR settings
 # OCR engine module name under services/ocr/, e.g. "ocr_engine_paddle" -> services/ocr/ocr_engine_paddle.py
-OCR_ENGINE = "ocr_engine_mistral"
+OCR_ENGINE = "ocr_engine_paddle"
 # Backward-compatible alias for typo usage.
 ORC_ENGINE = OCR_ENGINE
 OCR_ENGINE_OPTIONS = {
